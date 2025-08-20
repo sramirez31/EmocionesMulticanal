@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmocionesMulticanal - Sistema de Detección Emocional</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <!-- ONNX Runtime Web -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Jitsi Meet API -->
+    <script src="https://meet.jit.si/external_api.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>?? EmocionesMulticanal</h1>
+            <p>Sistema de Detección Emocional Multimodal para Videollamadas</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Panel de Control -->
+            <div class="control-panel">
+                <div class="status-section">
+                    <h3>Estado del Sistema</h3>
+                    <div class="status-indicators">
+                        <div class="indicator" id="camera-status">
+                            <span class="icon">??</span>
+                            <span class="text">Cámara: Desconectada</span>
+                        </div>
+                        <div class="indicator" id="mic-status">
+                            <span class="icon">??</span>
+                            <span class="text">Micrófono: Desconectado</span>
+                        </div>
+                        <div class="indicator" id="analysis-status">
+                            <span class="icon">??</span>
+                            <span class="text">Análisis: Detenido</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button id="request-permissions" class="btn btn-primary">
+                        ?? Otorgar Permisos
+                    </button>
+                    <button id="start-analysis" class="btn btn-success" disabled>
+                        ?? Iniciar Análisis
+                    </button>
+                    <button id="pause-analysis" class="btn btn-warning" disabled>
+                        ?? Pausar Análisis
+                    </button>
+                    <button id="stop-analysis" class="btn btn-danger" disabled>
+                        ?? Finalizar y Procesar
+                    </button>
+                </div>
+
+                <div class="session-info">
+                    <h4>Información de Sesión</h4>
+                    <p>Nombre: <input type="text" id="user-name" placeholder="Tu nombre"></p>
+                    <p>Sala: <input type="text" id="room-name" placeholder="nombre-sala" value="EmocionesMulticanal-demo"></p>
+                    <p>Duración: <span id="session-duration">00:00:00</span></p>
+                </div>
+            </div>
+
+            <!-- Video Preview y Métricas -->
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="local-video" autoplay muted playsinline></video>
+                    <canvas id="face-canvas"></canvas>
+                    <div class="video-overlay">
+                        <div class="emotion-display" id="current-emotion">
+                            ?? Neutral
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics-panel">
+                    <h4>Métricas en Tiempo Real</h4>
+                    <div class="metric">
+                        <label>Presencia Facial:</label>
+                        <div class="progress-bar">
+                            <div class="progress" id="face-presence"></div>
+                        </div>
+                        <span id="face-percentage">0%</span>
+                    </div>
+                    <div class="metric">
+                        <label>Nivel de Audio:</label>
+                        <div class="progress-bar">
+                            <div class="progress" id="audio-level"></div>
+                        </div>
+                        <span id="audio-db">-8 dB</span>
+                    </div>
+                    <div class="metric">
+                        <label>Turnos de Habla:</label>
+                        <span id="speech-turns">0</span>
+                    </div>
+                    <div class="metric">
+                        <label>Sentimiento Actual:</label>
+                        <span id="current-sentiment">Neutral</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Jitsi Meet Container -->
+        <div class="jitsi-container" id="jitsi-container" style="display: none;">
+            <div class="jitsi-header">
+                <h3>Videollamada - Sala: <span id="current-room"></span></h3>
+                <button id="toggle-jitsi" class="btn btn-secondary">Minimizar</button>
+            </div>
+            <div id="jitsi-meet"></div>
+        </div>
+
+        <!-- Resultados y Exportación -->
+        <div class="results-section" id="results-section" style="display: none;">
+            <h3>?? Resultados de la Sesión</h3>
+            <div class="results-summary">
+                <div class="summary-card">
+                    <h4>Resumen General</h4>
+                    <p>Duración total: <span id="total-duration"></span></p>
+                    <p>Palabras transcritas: <span id="word-count"></span></p>
+                    <p>Emoción predominante: <span id="dominant-emotion"></span></p>
+                    <p>Sentimiento general: <span id="overall-sentiment"></span></p>
+                </div>
+            </div>
+
+            <div class="export-options">
+                <h4>Descargar Resultados</h4>
+                <button id="download-transcript" class="btn btn-info">
+                    ?? Transcripción (.txt)
+                </button>
+                <button id="download-transcript-json" class="btn btn-info">
+                    ?? Transcripción con Tiempos (.json)
+                </button>
+                <button id="download-metrics" class="btn btn-info">
+                    ?? Métricas Visuales (.csv)
+                </button>
+                <button id="download-sentiment" class="btn btn-info">
+                    ?? Análisis de Sentimiento (.csv)
+                </button>
+                <button id="download-report" class="btn btn-success">
+                    ?? Reporte Completo (.html)
+                </button>
+            </div>
+
+            <div class="privacy-controls">
+                <button id="close-session" class="btn btn-danger">
+                    ??? Cerrar Sesión y Borrar Datos
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+    <script src="js/vision.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/fusion.js"></script>
+    <script src="js/export.js"></script>
+</body>
+</html>
